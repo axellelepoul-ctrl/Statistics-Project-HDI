@@ -1,0 +1,949 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+plot(cars)
+
+#2.Préparation du jeu de données
+
+# Charger les fichiers CSV avec un encodage explicite sinon ça ne fonctionne pas
+
+usages1 <- read.csv("data/usages.effec1.csv", fileEncoding = "UTF-8")
+questionnaire1 <- read.csv("data/effec1.quest.compil.csv", sep = ",", fileEncoding = "ISO-8859-1")
+
+usages2 <- read.csv("data/usages.effec2.csv", fileEncoding = "UTF-8")
+questionnaire2 <- read.csv("data/effec2.quest.compil.csv", fileEncoding = "ISO-8859-1")
+
+usages3 <- read.csv("data/usages.effec3.csv", fileEncoding = "UTF-8")
+questionnaire3 <- read.csv("data/effec3.quest.compil.csv", fileEncoding = "ISO-8859-1")
+
+```
+```{r}
+#Rassembler chaque itération avec celle qui lui correspond
+
+library(dplyr)
+
+# Étape 1 : Joindre usages1/questionnaire1
+effec1 <- merge(
+  usages1,
+  questionnaire1 %>% select(Student_ID, Country_HDI, Gender), # Conserver uniquement HDI et genre
+  by = "Student_ID",
+  all = TRUE
+)
+write.csv(effec1, "effec1.csv", row.names = FALSE)
+
+# Étape 2 : Joindre usages2/questionnaire2
+effec2 <- merge(
+  usages2,
+  questionnaire2 %>% select(Student_ID, Country_HDI, Gender), # Conserver uniquement HDI et genre
+  by = "Student_ID",
+  all = TRUE
+)
+write.csv(effec2, "effec2.csv", row.names = FALSE)
+
+# Étape 3 : Joindre usages3/questionnaire3
+effec3 <- merge(
+  usages3,
+  questionnaire3 %>% select(Student_ID, Country_HDI, Gender), # Conserver uniquement HDI et genre
+  by = "Student_ID",
+  all = TRUE
+)
+write.csv(effec3, "effec3.csv", row.names = FALSE)
+```
+
+
+```{r}
+# Ajouter la colonne itération
+effec1_1 <- effec1 %>% mutate(iteration = 1)
+effec1_2 <- effec2 %>% mutate(iteration = 2)
+effec1_3 <- effec3 %>% mutate(iteration = 3)
+
+# Rassembler toutes les itérations ensemble
+effec_global <- bind_rows(effec1_1, effec1_2, effec1_3)
+
+head(effec_global)
+
+write.csv(effec_global, "dataframe.csv", row.names = FALSE)
+
+```
+
+```{r}
+library(dplyr)
+
+effec_global2 <- effec_global %>%
+  mutate(
+    Videos_visonnees = 
+      rowSums(select(., 18:23), na.rm = TRUE) +
+      rowSums(select(., 25:30), na.rm = TRUE) +
+      rowSums(select(., 32:37), na.rm = TRUE) +
+      rowSums(select(., 39:44), na.rm = TRUE) +
+      rowSums(select(., 46:51), na.rm = TRUE)
+  )
+
+
+effec_global2 <- effec_global2 %>%
+  mutate(
+    Quizz_faits = 
+      rowSums(select(., c(7, 9, 11, 12, 14)), na.rm = TRUE))
+
+```
+
+
+```{r}
+library(dplyr)
+
+# Remplacer tous les "H" et "M" par "I" dans une colonne
+effec_global3 <- effec_global2 %>%
+  mutate(
+    Country_HDI = gsub("^[HM]$", "I", Country_HDI)
+  )
+
+Indice_HDI <- effec_global3 %>%
+  count(Country_HDI)
+
+print(Indice_HDI)
+
+write.csv(effec_global3, "effec3.csv", row.names = FALSE)
+```
+
+```{r}
+effec_global3 <- effec_global3 %>%
+   mutate(
+    Certificat.bin = if_else(Exam.bin == 1 | Assignment.bin == 1, 1, 0))
+```
+
+
+
+```{r}
+#Associer tous les Exam.bin = 1 et Assignment.bin = 1 à la variable Complete, on les associe également à leur itération
+
+library(dplyr)
+
+effec_global3 <- effec_global3 %>%
+  mutate(Complete = ifelse(Exam.bin == 1 | Assignment.bin == 1, iteration, NA))
+
+# 'Complet_with_iteration' aura la valeur de 'iteration' (1, 2, ou 3) pour ceux qui remplissent la condition,
+# sinon la valeur sera NA
+
+write.csv(effec_global3, "effec3.csv", row.names = FALSE)
+```
+
+
+```{r}
+#Disengaging learners
+
+library(dplyr)
+
+effec_global3 <- effec_global3 %>%
+  mutate(Disengaging_learners = ifelse(
+    Exam.bin == 0 & 
+    Assignment.bin == 0 & 
+    Quizz.1.bin == 1 & 
+    Quizz.2.bin == 1 & 
+    Quizz.3.bin == 1 & 
+    Quizz.4.bin == 1 & 
+    Quizz.5.bin == 1,
+    iteration, NA))  # L'itération est assignée si les conditions sont remplies, sinon NA
+
+# La variable 'Disengaging_learners' aura l'itération (1, 2 ou 3) uniquement si les conditions sont remplies
+
+```
+
+
+```{r}
+#auditing learners
+library(dplyr)
+
+# Créer la nouvelle variable 'Videos_visonnees' pour les étudiants qui ont vu au moins 6 vidéos
+effec_global3 <- effec_global3 %>%
+  mutate(Auditing_learners = ifelse(
+    Exam.bin == 0 & 
+    Assignment.bin == 0 & 
+    Quizz.1.bin == 0 & 
+    Quizz.2.bin == 0 & 
+    Quizz.3.bin == 0 & 
+    Quizz.4.bin == 0 & 
+    Quizz.5.bin == 0 &
+    Videos_visonnees >= 6,  # Vérifie si l'étudiant a vu au moins 6 vidéos
+    iteration, NA))  # Si les conditions sont remplies, on attribue l'itération, sinon NA
+
+
+
+
+```
+
+
+
+```{r}
+#bystander
+
+library(dplyr)
+
+effec_global3 <- effec_global3 %>%
+  mutate(Bystander = ifelse(
+    Exam.bin == 0 & 
+    Assignment.bin == 0 & 
+    Quizz.1.bin == 0 & 
+    Quizz.2.bin == 0 & 
+    Quizz.3.bin == 0 & 
+    Quizz.4.bin == 0 & 
+    Quizz.5.bin == 0 &
+    Videos_visonnees < 6,  # Vérifie si l'étudiant a vu au moins 6 vidéos
+    iteration, NA))  # Si les conditions sont remplies, on attribue l'itération, sinon NA
+
+write.csv(effec_global3, "effec78.csv", row.names = FALSE)
+
+```
+
+
+```{r}
+library(dplyr)
+library(tidyr)
+
+table_result <- effec_global3 %>%
+  select(Complete, Disengaging_learners, Auditing_learners, Bystander, iteration) %>%
+  group_by(iteration) %>%
+  
+  # Compter le nombre d'observations pour chaque catégorie par itération
+  summarise(
+    Complete = sum(Complete == iteration, na.rm = TRUE),
+    Disengaging_learners = sum(Disengaging_learners == iteration, na.rm = TRUE),
+    Auditing_learners = sum(Auditing_learners == iteration, na.rm = TRUE),
+    Bystander = sum(Bystander == iteration, na.rm = TRUE)
+  ) %>%
+
+  # Calculer le total pour chaque itération
+  mutate(
+    total = Complete + Disengaging_learners + Auditing_learners + Bystander,
+    Complete = round(Complete / total * 100, 2),  
+    Disengaging_learners = round(Disengaging_learners / total * 100, 2),   
+    Auditing_learners = round(Auditing_learners / total * 100, 2),  
+    Bystander = round(Bystander / total * 100, 2)   
+  ) %>%
+  
+  # Sélectionner les colonnes pour afficher les pourcentages
+  select(-total) %>%
+  
+  # Transposer la table pour que les catégories soient en lignes
+  gather(key = "Category", value = "Percentage", Complete, Disengaging_learners, Auditing_learners, Bystander) %>%
+  
+  # Mettre les catégories en lignes et les itérations en colonnes
+  spread(key = iteration, value = Percentage) %>%
+  
+  # Afficher les résultats
+  print()
+
+
+```
+
+```{r}
+#Table des données manquantes
+
+missing_data <- effec_global3 %>%
+  summarise_all(~ sum(is.na(.))) %>%
+  gather(key = "Variable", value = "Missing_Count") %>%
+  mutate(
+    Missing_Proportion = round(Missing_Count / nrow(effec_global) * 100, 2)
+  )
+
+print(missing_data)
+
+```
+
+```{r}
+#Heatmap données manquantes
+# Chargez les packages nécessaires
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+
+# Convertir les données en une matrice binaire où 1 = NA et 0 = non-NA
+effec_global3_na <- effec_global3 %>%
+  mutate(across(everything(), ~is.na(.)))  # transforme chaque variable en binaire (TRUE/FALSE)
+
+# Convertir en format long pour ggplot
+effec_global3_long <- effec_global3_na %>%
+  pivot_longer(cols = everything(), names_to = "variable", values_to = "missing") %>%
+  mutate(missing = ifelse(missing, 1, 0),  # Convertir TRUE/FALSE en 1/0
+         row_id = rep(1:nrow(effec_global3), each = ncol(effec_global3)))  # Créer un identifiant unique pour chaque ligne
+
+# Créer une heatmap avec ggplot
+ggplot(effec_global3_long, aes(x = variable, y = row_id, fill = factor(missing))) +
+  geom_tile() +
+  scale_fill_manual(values = c("white", "black")) +  # Noir pour les valeurs manquantes, blanc pour non-manquantes
+  theme_minimal() +
+  labs(title = "Heatmap des valeurs manquantes",
+       x = "Variables",
+       y = "Observations") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))  # Rotation des noms des variables pour plus de lisibilité
+
+
+```
+
+```{r}
+#Croiser HDI et Gender
+
+contingency_table <- table(effec_global3$Country_HDI, effec_global3$Gender)
+print(contingency_table)
+
+```
+```{r}
+# Effectuer le test du chi2
+
+chi_result <- chisq.test(contingency_table)   # renvoie une liste
+print(chi_test)
+
+# Extraire la statistique X-squared
+chi_val <- chi_result$statistic
+
+```
+```{r}
+# Générer un mosaic plot de la table de contingence
+#install.packages("vcd")
+library(vcd)
+
+mosaic(chi_test$observed, main = "Mosaic Plot of HDI and Gender", shade = TRUE, legend = TRUE)
+
+
+
+```
+
+Que représentent les couleurs bleues et rouges dans un mosaic plot du test Chi2 ?
+Dans un mosaic plot basé sur le test Chi2, les couleurs indiquent les écarts standardisés par rapport à l'indépendance.
+
+Couleurs bleues : Elles signalent des associations observées plus fortes que prévu sous l'hypothèse d'indépendance. 
+Couleurs rouges : Elles signalent des associations observées moins fortes que prévu sous l'hypothèse d'indépendance. 
+La teinte des couleurs peut également varier en fonction de la magnitude des écarts standardisés, ce qui permet de visualiser l'ampleur de la déviation.
+
+Pourquoi n’est-il pas possible que toutes les cases soient bleues ou rouges ?
+Il est impossible que toutes les cases soient de la même couleur car les couleurs reflètent des écarts entre les fréquences observées et celles attendues. Si toutes les cases étaient bleues ou rouges, cela signifierait que toutes les observations s'écartent de manière cohérente dans une direction, ce qui est contradictoire avec les règles de conservation des totaux marginaux dans un tableau de contingence.
+
+
+
+
+```{r}
+
+```
+
+
+```{r}
+#5 Mod`ele lineaire, tests non parametriques
+#5.1 Sur des donnees-type
+
+library(ggplot2)
+data(iris)
+
+ggplot(iris, aes(x = Petal.Length, y = Petal.Width, color = Species, shape = Species)) +
+  geom_point(size = 3) + 
+  labs(title = "Largeur du pétale en fonction de la longueur du pétale",
+       x = "Longueur du pétale (cm)",
+       y = "Largeur du pétale (cm)") +
+  theme_minimal()
+```
+```{r}
+# Ajuster le modèle de régression linéaire
+modele_linaire <- lm(Petal.Width ~ Petal.Length, data = iris)
+summary(modele_linaire)
+
+ggplot(iris, aes(x = Petal.Length, y = Petal.Width)) +
+  geom_point(aes(color = Species), size = 3) +  # Nuage de points
+  geom_smooth(method = "lm", se = FALSE, color = "black") +  # Droite de régression
+  labs(title = "Régression linéaire : Largeur du pétale en fonction de la longueur du pétale",
+       x = "Longueur du pétale (cm)",
+       y = "Largeur du pétale (cm)") +
+  theme_minimal()
+
+```
+```{r}
+#Pearson
+correlation_pearson <- cor(iris$Petal.Length, iris$Petal.Width)
+correlation_pearson
+```
+```{r}
+#Boxplot largeur des pétales en fonction de l'espèce
+ggplot(iris, aes(x = Species, y = Petal.Width, fill = Species)) +
+  geom_boxplot() +  # Créer le boxplot
+  labs(title = "Largeur du pétale en fonction de l'espèce",
+       x = "Espèce",
+       y = "Largeur du pétale (cm)") +
+  theme_minimal()
+
+```
+```{r}
+# ANOVA pour calculer la force du lien entre ces deux variables
+library(ggplot2)
+
+anova_result <- aov(Petal.Width ~ Species, data = iris)
+summary(anova_result)
+
+# Table des sommes des carrés
+anova_table <- summary(anova_result)
+anova_table[[1]]
+```
+```{r}
+#qqplot
+library(ggplot2)
+
+anova_result <- aov(Petal.Width ~ Species, data = iris)
+residus <- residuals(anova_result)
+
+# Tracer le QQ plot
+qqnorm(residus)
+qqline(residus, col = "red")  
+
+```
+```{r}
+#5.2 Application aux donnees des MOOC
+# Appliquer le test t de Student
+test_t <- t.test(Videos_visonnees ~ Gender, data = effec_global3)
+
+# Afficher les résultats du test t
+print(test_t)
+```
+```{r}
+# Appliquer le test de Mann-Whitney (test non paramétrique) pour comparer les distributions des vidéos visionnées selon le genre
+test_mann_whitney <- wilcox.test(Videos_visonnees ~ Gender, data = effec_global3)
+
+# Afficher les résultats du test de Mann-Whitney
+print(test_mann_whitney)
+```
+```{r}
+# Appliquer la régression linéaire
+regression_linaire <- lm(Videos_visonnees ~ Quizz_faits, data = effec_global3)
+summary(regression_linaire)
+
+# Test de corrélation de Pearson
+cor_pearson <- cor.test(effec_global3$Quizz_faits, effec_global3$Videos_visonnees, method = "pearson")
+print(cor_pearson)
+
+# Test de corrélation de Spearman
+cor_spearman <- cor.test(effec_global3$Quizz_faits, effec_global3$Videos_visonnees, method = "spearman")
+print(cor_spearman)
+
+```
+```{r}
+# Tracer le scatterplot
+plot(effec_global3$Quizz_faits, effec_global3$Videos_visonnees,
+     main = "Relation entre le Nombre de Quiz Réalisés et les Vidéos Visionnées",
+     xlab = "Nombre de Quiz Réalisés",
+     ylab = "Nombre de Vidéos Visionnées",
+     pch = 19, col = "blue")
+
+# Ajouter la ligne de régression linéaire au scatterplot
+abline(regression_linaire, col = "red")
+
+```
+
+```{r}
+#ANOVA 
+
+# Modèle linéaire avec HDI et Genre comme facteurs explicatifs
+mod <- lm(Videos_visonnees ~ Country_HDI + Gender, data = effec_global3)
+
+# ANOVA pour le modèle
+anova_results <- anova(mod)
+summary(mod)  # Affiche un résumé du modèle linéaire
+print(anova_results)  # Affiche les résultats de l'ANOVA
+
+
+```
+```{r}
+#2. Interprétation des résultats
+
+#L'ANOVA nous donne des informations sur l'effet global des variables HDI et Gender sur Videos_visonnees. Les résultats incluent :
+
+#Sommes de carrés (SS)
+#Degrés de liberté (ddl)
+#Valeur F pour chaque facteur
+#P-value associée
+#L’ANOVA teste l’hypothèse nulle pour chaque facteur, et si la p-value est inférieure au seuil (généralement 0.05), cela indique que le facteur a un effet significatif sur le nombre de vidéos vues.
+
+#L'HDI a un effet significatif sur le nombre de vidéos visionnées, tandis que le genre n'a pas d'effet significatif dans ce modèle.
+
+```
+
+```{r}
+# ANOVA 2
+
+# Chargement des bibliothèques nécessaires
+library(tidyverse)
+
+# Création du modèle linéaire
+mod <- lm(Videos_visonnees ~ Country_HDI + Gender, data = effec_global3)
+
+# Résumé du modèle
+summary(mod)
+
+# Analyse de la variance (ANOVA)
+anova_res <- anova(mod)
+print(anova_res)
+
+
+```
+
+```{r}
+# Calcul des eta²
+eta_squared <- anova_res$`Sum Sq` / sum(anova_res$`Sum Sq`)
+
+# Créer une table d'eta²
+eta_squared_table <- data.frame(
+  Variable = rownames(anova_res),
+  Eta_Squared = eta_squared
+)
+
+# Affichage de la table des eta²
+print(eta_squared_table)
+
+```
+
+```{r}
+# Résumé du modèle linéaire pour afficher les estimations des paramètres
+summary(mod)
+
+# Créer un tableau avec les résultats de chaque paramètre (Estimation, Erreur Std, t-value, p-value)
+model_summary <- data.frame(
+  Parameter = rownames(summary(mod)$coefficients),
+  Estimate = summary(mod)$coefficients[, 1],
+  Std_Error = summary(mod)$coefficients[, 2],
+  t_value = summary(mod)$coefficients[, 3],
+  p_value = summary(mod)$coefficients[, 4]
+)
+
+# Affichage du tableau des résultats
+print(model_summary)
+
+```
+
+```{r}
+#Pourquoi y a-t-il un écart-type associé aux estimations des paramètres ?
+#L'écart-type associé aux estimations des paramètres dans un modèle de régression linéaire représente la variabilité des estimations des coefficients de régression. En d'autres termes, il mesure l'incertitude quant à la précision de l'estimation des coefficients.
+
+#Lorsqu'on ajuste un modèle linéaire, nous estimons les paramètres (ici les coefficients associés à Country_HDI et Gender) à partir des données disponibles. Cependant, ces estimations ne sont pas exactes car elles sont influencées par des facteurs aléatoires dans les données (telles que les erreurs de mesure ou les variables non incluses dans le modèle). L'écart-type de l'estimation permet donc de comprendre à quel point une estimation est précise ou incertaine. Plus l'écart-type est petit, plus l'estimation est précise.
+
+#Comment est calculé le test t pour chaque paramètre dans la table d’ANOVA ?
+#Le test t pour chaque paramètre est utilisé pour tester l'hypothèse nulle selon laquelle le coefficient d'un paramètre (par exemple, Country_HDII ou Genderune femme) est égal à zéro (i.e., aucune relation entre la variable indépendante et la variable dépendante). Le test t est calculé comme suit :
+
+#Les valeurs t permettent de tester si l'effet de chaque paramètre est significatif par rapport aux données. Si le t-value est élevé (comme pour Country_HDII et Country_HDITH), cela suggère que l'effet est statistiquement significatif. Si le t-value est faible (comme pour Genderune femme), cela suggère que l'effet n'est pas significatif.
+
+#À quoi correspondent les eta² (η²) pour chaque variable ?
+#L'eta carré (η²) est une mesure de la taille de l'effet d'une variable indépendante sur la variable dépendante. Elle représente la proportion de la variance totale de la variable dépendante qui est expliquée par une variable indépendante. Autrement dit, η² indique dans quelle mesure chaque facteur (par exemple, Country_HDI ou Gender) contribue à la variabilité des données.
+
+
+```
+
+
+
+```{r}
+#install.packages("afex")
+library ("afex")
+
+# Création du modèle avec interaction
+mod_interaction <- lm(Videos_visonnees ~ Country_HDI * Gender, data = effec_global3)
+
+# Résumé du modèle
+summary(mod_interaction)
+
+# Table ANOVA pour ce modèle avec interaction
+anova(mod_interaction)
+
+# Calcul des eta² pour chaque variable
+mod_aov <- aov(Videos_visonnees ~ Country_HDI * Gender, data = effec_global3)
+
+# Résumé de l'ANOVA
+summary(mod_aov)
+
+# Calcul de l'eta² avec DescTools
+#install.packages("DescTools")
+library(DescTools)
+eta2_values <- eta2(mod_aov, type = 1)  # type 1 = eta² classique
+print(eta2_values)
+```
+```{r}
+#Equivalent non paramétrique pour le genre
+
+kruskal_test_gender <- kruskal.test(Videos_visonnees ~ Gender, data = effec_global3)
+print(kruskal_test_gender)
+
+
+```
+
+```{r}
+#6 Régressions logistiques
+#6.1 Données du MOOC, variables booléennes et odd ratios
+
+
+# Charger les bibliothèques nécessaires
+library(ggplot2)
+
+# Ajuster le modèle logistique (GLM avec lien logit)
+modele_logit <- glm(Certificat.bin ~ Gender + Country_HDI, 
+                    data = effec_global3, 
+                    family = binomial(link = "logit"))
+
+# Résumé du modèle
+summary(modele_logit)
+
+# Extraire les coefficients et les p-values du modèle
+coeffs <- summary(modele_logit)$coefficients
+
+# Calcul des Odds Ratios et des intervalles de confiance à 95%
+odds_ratios <- exp(coeffs[, "Estimate"])
+IC_inf <- exp(coeffs[, "Estimate"] - 1.96 * coeffs[, "Std. Error"])
+IC_sup <- exp(coeffs[, "Estimate"] + 1.96 * coeffs[, "Std. Error"])
+p_values <- coeffs[, "Pr(>|z|)"]
+
+# Créer un tableau des résultats
+resultats <- data.frame(
+  Variable = rownames(coeffs),
+  OddsRatio = odds_ratios,
+  `IC 2.5%` = IC_inf,
+  `IC 97.5%` = IC_sup,
+  `p-value` = p_values
+)
+
+# Ajouter les significations avec les étoiles
+resultats$Significatif <- cut(
+  resultats$`p-value`,
+  breaks = c(-Inf, 0.001, 0.01, 0.05, Inf),
+  labels = c("***", "**", "*", "")
+)
+
+# Ajouter une colonne pour indiquer la référence
+resultats$Reference <- ifelse(resultats$Variable == "(Intercept)", "Réf", "")
+
+# Vérification de la table des résultats
+print(resultats)
+
+# Forest Plot
+ggplot(resultats, aes(x = Variable, y = OddsRatio, ymin = `IC 2.5%`, ymax = `IC 97.5%`)) +
+  geom_pointrange() +
+  geom_hline(yintercept = 1, linetype = "dashed") +
+  coord_flip() +
+  labs(
+    title = "Forest Plot des Odds Ratios",
+    x = "Variable",
+    y = "Odds Ratio"
+  ) +
+  theme_minimal()
+
+
+
+```
+
+```{r}
+# Ajuster un modèle logistique simple pour la variable Gender
+modele_logit_simple <- glm(Certificat.bin ~ Gender, 
+                           data = effec_global3, 
+                           family = binomial(link = "logit"))
+
+# Résumé du modèle pour obtenir les coefficients
+summary(modele_logit_simple)
+
+# Extraire les coefficients du modèle
+coeffs_simple <- summary(modele_logit_simple)$coefficients
+
+# Vérification pour éviter les erreurs avec des valeurs infinies ou NA
+odd_ratio_gender <- exp(coeffs_simple["Gender"])
+
+# Si l'odd ratio est égal à zéro ou NaN, on donne une valeur par défaut de 1
+if (is.na(odd_ratio_gender) || odd_ratio_gender == 0) {
+  odd_ratio_gender <- 1
+}
+
+
+
+```
+
+
+```{r}
+# Charger les bibliothèques nécessaires
+library(ggplot2)
+
+# Ajuster le modèle logistique (GLM avec lien logit)
+modele_logit <- glm(Certificat.bin ~ Gender + Country_HDI, 
+                    data = effec_global3, 
+                    family = binomial(link = "logit"))
+
+# Résumé du modèle
+summary(modele_logit)
+
+# Extraire les coefficients et les p-values du modèle
+coeffs <- summary(modele_logit)$coefficients
+
+# Vérification des p-values pour s'assurer qu'elles sont numériques
+p_values <- as.numeric(coeffs[, "Pr(>|z|)"])
+
+# Calcul des Odds Ratios et des intervalles de confiance à 95%
+odds_ratios <- exp(coeffs[, "Estimate"])
+IC_inf <- exp(coeffs[, "Estimate"] - 1.96 * coeffs[, "Std. Error"])
+IC_sup <- exp(coeffs[, "Estimate"] + 1.96 * coeffs[, "Std. Error"])
+
+# Créer un tableau des résultats
+resultats <- data.frame(
+  Variable = rownames(coeffs),
+  OddsRatio = odds_ratios,
+  `IC 2.5%` = IC_inf,
+  `IC 97.5%` = IC_sup,
+  `p-value` = p_values
+)
+
+# Ajouter les significations avec les étoiles
+resultats$Significatif <- cut(
+  resultats$`p-value`,
+  breaks = c(-Inf, 0.001, 0.01, 0.05, Inf),
+  labels = c("***", "**", "*", "")
+)
+
+# Ajouter une colonne pour indiquer la référence
+resultats$Reference <- ifelse(resultats$Variable == "(Intercept)", "Réf", "")
+
+# Vérification de la table des résultats
+print(resultats)
+
+# Forest Plot
+ggplot(resultats, aes(x = Variable, y = OddsRatio, ymin = `IC 2.5%`, ymax = `IC 97.5%`)) +
+  geom_pointrange() +
+  geom_hline(yintercept = 1, linetype = "dashed") +
+  coord_flip() +
+  labs(
+    title = "Forest Plot des Odds Ratios",
+    x = "Variable",
+    y = "Odds Ratio"
+  ) +
+  theme_minimal()
+
+
+```
+
+
+
+Les résultats de l'analyse montrent des différences significatives entre les groupes dans plusieurs tests statistiques. Dans un modèle de régression linéaire, l'analyse des coefficients révèle que l'indicateur "Country_HDI" (développement humain par pays) a une influence significative sur la variable "Videos_visonnees", avec un coefficient pour chaque niveau du facteur "Country_HDI". En revanche, l'effet du genre (femme ou homme) sur cette variable n’est pas significatif (p-value > 0.05).
+
+De plus, un test de Kruskal-Wallis montre une différence significative entre les groupes en fonction du genre pour la variable "Videos_visonnees" (p-value = 0.000388). Cela suggère que les vidéos visionnées diffèrent selon le sexe des individus.
+
+Un autre modèle, un modèle de régression logistique, évalue l'impact de variables telles que le genre et le niveau du pays sur la probabilité de certification. Ici, le genre féminin (par rapport aux hommes) est associé à une diminution de la probabilité de recevoir un certificat (odd ratio < 1, p-value = 0.01802). Les résultats pour "Country_HDII" ne sont pas significatifs (p-value = 0.47198), tandis que pour "Country_HDITH", il existe un effet positif (p-value = 0.01315), indiquant que les pays ayant un développement humain plus élevé ont une probabilité accrue de certification.
+
+Ces résultats ont des implications pour mieux comprendre l'impact du développement humain et du genre sur les performances et l'accès à la certification dans différents pays.
+
+
+```{r}
+# Charger les données
+# Remplacer par le nom réel du jeu de données
+data <- read.csv("h:/Desktop/R/Statistiques/maths_competition_awards_data.csv")
+
+
+# Diviser les données en échantillons d'entraînement et de test (80% / 20%)
+set.seed(42)  # Fixer la graine pour la reproductibilité
+index <- sample(1:nrow(data), size = 0.8 * nrow(data))
+training_data <- data[index, ]
+test_data <- data[-index, ]
+
+```
+
+Distribution des données
+
+```{r}
+# Histogramme pour la variable 'note'
+hist(training_data$Math.Score, main = "Distribution des Notes", xlab = "Note", col = "lightblue", border = "black")
+
+# Histogramme pour la variable 'recompenses'
+hist(training_data$Awards, main = "Distribution des Récompenses", xlab = "Récompenses", col = "lightgreen", border = "black")
+
+```
+
+Ajuster un modèle de Poisson
+
+```{r}
+# Ajuster le modèle de régression de Poisson
+modele_poisson <- glm(Awards ~ Math.Score, 
+                      data = training_data, 
+                      family = poisson(link = "log"))
+
+```
+
+Diagnostic du modèle (QQ plot et autres)
+
+```{r}
+# Résidus du modèle
+residus <- residuals(modele_poisson, type = "deviance")
+
+# QQ plot des résidus
+qqnorm(residus)
+qqline(residus, col = "red")
+
+```
+
+Relation entre les variables et les prédictions
+
+```{r}
+# Prédictions du modèle sur les données d'entraînement
+predictions_train <- predict(modele_poisson, newdata = training_data, type = "response")
+
+# Graphique avec les données empiriques et les prédictions
+library(ggplot2)
+ggplot(training_data, aes(x = Math.Score, y = Awards)) +
+  geom_point(color = "blue") +  # Données empiriques
+  geom_line(aes(x = Math.Score, y = predictions_train), color = "red") +  # Prédictions du modèle
+  labs(title = "Relation entre Note et Récompenses",
+       x = "Note", y = "Récompenses") +
+  theme_minimal()
+
+```
+
+Calcul de l'erreur du modèle
+
+```{r}
+# Calcul de l'erreur pour les données d'entraînement
+rmse_train <- sqrt(mean((training_data$recompenses - predictions_train)^2))
+
+# Prédictions du modèle sur les données de test
+predictions_test <- predict(modele_poisson, newdata = test_data, type = "response")
+
+# Calcul de l'erreur pour les données de test
+rmse_test <- sqrt(mean((test_data$recompenses - predictions_test)^2))
+
+# Affichage des erreurs
+cat("Erreur pour les données d'entraînement (RMSE) :", rmse_train, "\n")
+cat("Erreur pour les données de test (RMSE) :", rmse_test, "\n")
+
+```
+
+6.3 Données du MOOC, diagnostics et loi de Poisson
+
+```{r}
+# Supposons que "data$videos_vues" représente les vidéos vues
+# Calcul de la moyenne de la variable
+lambda <- mean(effec_global3$Videos_visonnees)
+
+# Créer un histogramme de la distribution des vidéos vues
+hist(effec_global3$Videos_visonnees, breaks = 20, probability = TRUE, 
+     main = "Distribution du nombre de vidéos vues",
+     xlab = "Nombre de vidéos vues", col = "lightblue")
+
+# Ajouter la courbe de la loi de Poisson à l'histogramme
+x_vals <- 0:max(effec_global3$Videos_visonnees)
+lines(x_vals, dpois(x_vals, lambda), col = "red", lwd = 2)
+
+```
+
+2. Pourquoi la variable ne suit-elle pas exactement une loi de Poisson ?
+En général, lorsque l'on modélise un phénomène par une loi de Poisson, les données doivent respecter certaines conditions :
+
+Indépendance des événements : Les vidéos vues devraient être indépendantes les unes des autres, c'est-à-dire qu'une personne qui regarde une vidéo ne devrait pas affecter la probabilité qu'une autre vidéo soit regardée.
+Moyenne constante : Le taux moyen d'événements (ici, le nombre de vidéos vues) doit être constant pour toute la période étudiée.
+Cependant, dans le cadre d'un MOOC (Massive Open Online Course), ces hypothèses sont souvent violées :
+
+Comportement hétérogène des participants : Tous les participants ne suivent pas le même nombre de vidéos. Certains peuvent ne regarder qu'une seule vidéo, tandis que d'autres regardent de nombreuses vidéos. Cela crée une variabilité plus grande dans le nombre de vidéos vues que ce qui serait attendu sous une loi de Poisson.
+Sur-dispersion : Dans le cadre d'un MOOC, il est probable que les données présentent une sur-dispersion (c'est-à-dire que la variance est plus grande que la moyenne), ce qui est typiquement incompatible avec un modèle de Poisson, où la variance est égale à la moyenne.
+Participation irrégulière : Certains utilisateurs peuvent regarder plusieurs vidéos sur une courte période (par exemple, lors de sessions intensives), tandis que d'autres peuvent se connecter sporadiquement. Cette irrégularité dans les comportements de visionnage peut rendre la distribution des vidéos vues non homogène.
+Effet de la durée du MOOC : Un MOOC a une durée déterminée. Les participants qui commencent tôt peuvent visionner plus de vidéos que ceux qui s'inscrivent plus tard. Cette variation temporelle dans la participation peut également affecter la distribution.
+
+3. Est-ce un problème pour l’analyse ?
+Cela peut poser un problème pour l’analyse si vous voulez utiliser un modèle de Poisson pour tirer des conclusions précises sur les comportements des participants. Voici pourquoi :
+
+Si les données présentent une sur-dispersion, utiliser une loi de Poisson pourrait sous-estimer la variabilité réelle des comportements de visionnage. Dans ce cas, vous pourriez obtenir des intervalles de confiance et des tests statistiques qui ne sont pas fiables.
+La modélisation pourrait ne pas bien représenter les différences importantes entre les groupes d'utilisateurs (par exemple, ceux qui regardent beaucoup de vidéos vs ceux qui en regardent peu), ce qui pourrait fausser les conclusions que vous tirez des analyses.
+
+Pou ajuster : 
+```{r}
+# Utilisation du package "MASS" pour ajuster un modèle binomial négatif
+install.packages("MASS")
+library(MASS)
+model <- glm.nb(Videos_visonnees ~ 1, data = effec_global3)
+summary(model)
+
+```
+
+```{r}
+# Exemple de régression linéaire
+model <- lm(Videos_visonnees ~ 1, data = effec_global3)  # Modèle simple avec juste l'intercept
+
+# Résidus vs Fitted
+plot(model, which = 1)
+
+# Normal Q-Q
+plot(model, which = 2)
+
+# Scale-Location (Spread-Location)
+plot(model, which = 3)
+
+# Résidus vs Leverage
+plot(model, which = 5)
+
+```
+
+```{r}
+# Charger les données (exemple)
+
+# Convertir 'Genre' en variable factorielle si ce n'est pas déjà fait
+effec_global3$Gender <- as.factor(effec_global3$Gender)
+
+# Modéliser avec GLM et loi de Poisson
+model_poisson <- glm(Videos_visonnees ~ Gender + Country_HDI, data = effec_global3, family = poisson(link = "log"))
+
+# Résumé du modèle
+summary(model_poisson)
+
+```
+7. Exercices d’approfondissement : de l’ANOVA en autonomie à la multicolinéarité
+
+```{r}
+# Chargement du jeu de données
+data2 <- read.csv("h:/Desktop/R/Statistiques/scrap price.csv")
+
+# Aperçu des premières lignes
+head(data2)
+
+# Résumé statistique pour toutes les variables
+summary(data2)
+
+```
+
+```{r}
+# Test ANOVA pour comparer les moyennes des prix en fonction du type de produit
+anova_model <- aov(price ~ fueltypes, data = data2)
+
+# Résumé du modèle
+summary(anova_model)
+
+```
+```{r}
+# Installer et charger le package 'car' pour les calculs FIV
+#install.packages("car")
+library(car)
+
+# Calcul des FIV pour les variables indépendantes
+vif_model <- lm(price ~ ., data = data2)
+vif(vif_model)
+
+```
+```{r}
+# Charger le package pour créer des corrélations et des heatmaps
+#install.packages("corrplot")
+library(corrplot)
+
+# Calcul des corrélations entre les variables continues
+cor_matrix <- cor(data2[, sapply(data, is.numeric)])
+
+# Tracer le corrélogramme
+corrplot(cor_matrix, method = "circle")
+
+```
+
+
+```{r}
+# Supposons que 'variable_corr' soit une variable fortement corrélée
+data_cleaned <- data2[, !names(data2) %in% c("variable_corr")]
+
+# Recalcul des FIV après suppression de la variable
+vif_model_cleaned <- lm(price ~ ., data = data_cleaned)
+vif(vif_model_cleaned)
+
+```
+
