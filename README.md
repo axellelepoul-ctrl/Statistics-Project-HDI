@@ -1,109 +1,20 @@
 # Statistics-Project-HDI
 
-Description
+This R Notebook provides a comprehensive workflow for analyzing MOOC data. It includes data preparation, descriptive statistics, statistical testing, regression modeling, and visualizations.
 
-This R Notebook contains a complete analysis of MOOC data, including:
+The analysis starts by importing CSV files, merging usage data with questionnaires, and adding an iteration identifier. Derived variables are then created, such as the total number of videos watched (Videos_visonnees), total quizzes completed (Quizz_faits), learner categories (Complete, Disengaging_learners, Auditing_learners, Bystander), and a binary certification variable (Certificat.bin).
 
-Data preparation and cleaning from CSV files.
+Descriptive analyses include contingency tables for HDI by gender, missing data summaries, and percentage calculations for each learner category. Visualizations such as heatmaps, mosaic plots, histograms, scatterplots, and boxplots are generated to explore the data and identify patterns.
 
-Creation of derived variables (e.g., Videos_visonnees, Quizz_faits, Certificat.bin).
+Statistical analyses involve t-tests, Mann-Whitney tests, Kruskal-Wallis tests, linear regression, ANOVA with eta-squared effect sizes, and logistic regression to examine factors affecting certification probability. For count data like videos watched, Poisson and negative binomial regressions are used to account for overdispersion. Diagnostic checks, including QQ plots and residual plots, are applied to ensure model assumptions are met.
 
-Descriptive analysis (tables, percentages, missing values heatmaps).
+The notebook also covers additional analyses like correlation matrices, variance inflation factor (VIF) calculations, and alternative ANOVA applications for other datasets. Forest plots are included to visualize odds ratios from logistic models.
 
-Statistical tests: chi-square, ANOVA, t-test, Mann-Whitney.
+Important notes:
 
-Modeling: linear regression, logistic regression, Poisson and negative binomial regression.
+- Factor variables (like Gender) must be properly defined before analysis.
+- CSV file paths should be updated to match your system.
+- Odds ratio calculations require numeric p-values; convert with as.numeric() if necessary.
+- MOOC count data may not perfectly follow a Poisson distribution due to overdispersion or heterogeneous participant behavior.
 
-Visualizations: histograms, scatterplots, boxplots, mosaic plots, and forest plots.
-
-Notebook Structure
-
-Data Preparation
-
-Reading CSV files with proper encoding.
-
-Merging usages and questionnaire datasets.
-
-Adding the iteration column.
-
-Creating the combined dataset effec_global.
-
-Derived Variables
-
-Videos_visonnees: total number of videos watched.
-
-Quizz_faits: total number of quizzes completed.
-
-Learner categorization: Complete, Disengaging_learners, Auditing_learners, Bystander.
-
-Binary variable for certification: Certificat.bin.
-
-Descriptive Analysis
-
-Contingency table for HDI × Gender.
-
-Mosaic plot to visualize associations.
-
-Heatmap of missing values.
-
-Percentage of students per category and iteration.
-
-Statistical Analyses
-
-Non-parametric tests: t-test, Mann-Whitney, Kruskal-Wallis.
-
-Simple and multiple linear regression for Videos_visonnees.
-
-ANOVA and eta² calculation for effect size.
-
-Logistic regression to evaluate the influence of variables on certification probability.
-
-Poisson and negative binomial regression for videos watched.
-
-Visualizations
-
-Scatterplots with regression lines.
-
-Boxplots by category.
-
-Mosaic plots with color based on standardized residuals.
-
-Forest plots of odds ratios.
-
-Diagnostics
-
-Residual normality checks (QQ plots).
-
-Residuals vs. fitted plots for linear models.
-
-Overdispersion handling using negative binomial models.
-
-Additional Analyses
-
-Correlations and heatmaps.
-
-Variance Inflation Factor (VIF) calculation for linear models.
-
-ANOVA and Poisson model adjustments for other datasets.
-
-Required Packages
-
-dplyr, tidyr, ggplot2, vcd, DescTools, afex, MASS, car, corrplot.
-
-Important Notes
-
-File paths for CSV files must be updated according to your system.
-
-Factor variables (e.g., Gender) must be correctly defined before analysis.
-
-Forest plots and odds ratio calculations assume numeric p-values. Convert with as.numeric() if errors occur.
-
-Poisson distribution may not perfectly fit MOOC data due to overdispersion and heterogeneous participant behavior.
-
-Execution Instructions
-
-Run the chunks in order to ensure all variables are created properly.
-
-Check for warnings or errors when reading CSV files (proper encoding required).
-
-Logistic regression coefficients and p-values are automatically extracted and converted into odds ratios with confidence intervals.
+Required R packages include dplyr, tidyr, ggplot2, vcd, DescTools, afex, MASS, car, and corrplot.
